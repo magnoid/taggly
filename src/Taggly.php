@@ -256,7 +256,7 @@ class Taggly {
      * @param  array  $tags
      * @return string
      */
-    public function cloud(Array $tags = null)
+    public function cloud(Array $tags = null, String $className = 'tags')
     {
         if ($tags) $this->setTags($tags);
 
@@ -271,7 +271,7 @@ class Taggly {
             $output .= $this->getTagElement($tag);
         }
 
-        return '<div class="tags">'.$output.'</div>';
+        return '<div class="'.$className.'">'.$output.'</div>';
     }
 
     /**
