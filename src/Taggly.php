@@ -44,6 +44,15 @@ class Taggly {
      */
     protected $shuffleTags = true;
 
+    public $autoRefresh = False;
+
+    protected $_countMin;
+    protected $_countMax;
+    protected $_countRange;
+    protected $_countFactor;
+    protected $_fontSizeRange;
+    protected $_fontSizeFactor;
+
     /**
      * Get the tags.
      *
@@ -69,8 +78,12 @@ class Taggly {
      *
      * @return int
      */
-    public function getMinimumCount()
+    public function getMinimumCount($refresh = False)
     {
+
+        // Only calculate the value if we need/want to
+        if (!$refresh && !$this->autoRefresh && isset($this->_countMin)) return $this->_countMin;
+
         $minimumCount = 0;
 
         foreach ($this->getTags() as $tag)
@@ -85,7 +98,8 @@ class Taggly {
             }
         }
 
-        return $minimumCount;
+        $this->_countMin = $minimumCount;
+        return $this->_countMin;
     }
 
     /**
@@ -93,8 +107,11 @@ class Taggly {
      *
      * @return int
      */
-    public function getMaximumCount()
+    public function getMaximumCount($refresh = False)
     {
+        // Only calculate the value if we need/want to
+        if (!$refresh && !$this->autoRefresh && isset($this->_countMax)) return $this->_countMax;
+
         $maximumCount = null;
 
         foreach ($this->getTags() as $tag)
@@ -109,19 +126,64 @@ class Taggly {
             }
         }
 
-        return $maximumCount;
+        $this->_countMax = $maximumCount;
+        return $this->_countMax;
     }
 
     /**
-     * Get the offset between the highest and lowest tag count.
+     * Get the range between the highest and lowest tag count.
      *
      * @return int
      */
-    public function getOffset()
+    public function getCountRange($refresh = False)
     {
-        $offset = $this->getMaximumCount() - $this->getMinimumCount();
+        // Only calculate the value if we need/want to
+        if (!$refresh && !$this->autoRefresh && isset($this->_countRange)) return $this->_countRange;
 
-        return ($offset < 1) ? 1 : $offset;
+        $range = $this->getMaximumCount($refresh) - $this->getMinimumCount($refresh);
+
+        $this->_countRange = ($range < 1) ? 1 : $range;
+        return $this->_countRange;
+    }
+
+    public function getCountFactor($refresh = False)
+    {
+
+        if (!$refresh && !$this->autoRefresh && isset($this->_countRange)) return $this->_countFactor;
+
+        $this->_countFactor = $this->getCountRange() / 100;
+
+        return $this->_countFactor;
+
+    }
+
+    public function getFontSizeRange($refresh = False)
+    {
+        if (!$refresh && !$this->autoRefresh && isset($this->_fontSizeRange)) return $this->_fontSizeRange;
+
+        $range = $this->getMaximumFontSize() - $this->getMinimumFontSize();
+
+        $this->_fontSizeRange = ($range < 1) ? 1 : $range;
+
+        return $this->_fontSizeRange;
+
+    }
+
+    public function getFontSizeFactor($refresh = False)
+    {
+
+        if (!$refresh && !$this->autoRefresh && isset($this->_fontSizeFactor)) return $this->_fontSizeFactor;
+
+        $this->_fontSizeFactor = $this->getFontSizeRange() / 100;
+
+        return $this->_fontSizeFactor;
+
+    }
+
+    public function getCountPercentile(Int $count)
+    {
+        return ($count - $this->getMinimumCount()) / $this->getCountFactor();
+
     }
 
     /**
@@ -194,7 +256,7 @@ class Taggly {
      * @param  array  $tags
      * @return string
      */
-    public function cloud(array $tags = null)
+    public function cloud(Array $tags = null)
     {
         if ($tags) $this->setTags($tags);
 
@@ -220,8 +282,35 @@ class Taggly {
      */
     public function getFontSize(Tag $tag)
     {
+
+
+    $countPercentile = $this->getCountPercentile($tag->getCount());
+    $fontSize = $this->getMinimumFontSize() + ($countPercentile * $this->getFontSizeFactor());
+
+    $data = [
+        'minFontSize' => $this->getMinimumFontSize(),
+        'maxFontSize' => $this->getMaximumFontSize(),
+        'fontRange'   => $this->getFontSizeRange(),
+        'fontFactor'  => $this->getFontSizeFactor(),
+        '----------'  => '-------------------------',
+        'minCount'    => $this->getMinimumCount(),
+        'maxCount'    => $this->getMaximumCount(),
+        'countRange'  => $this->getCountRange(),
+        'countFactor' => $this->getCountFactor(),
+        'countPtile'  => $countPercentile,
+        '----------'  => '-------------------------',
+        'formula'     => $this->getMinimumFontSize().' + ('.$countPercentile.' * '.$this->getFontSizeFactor().' )',
+        'fontSize'    => $fontSize,
+
+
+    ];
+
+    error_log(print_r($data, True));
+
+    return $fontSize;
+
         return $this->getMinimumFontSize() + ($tag->getCount() - $this->getMinimumCount()) 
-            + ($this->getMaximumFontSize() - $this->getMinimumFontSize()) / $this->getOffset();
+            + ($this->getMaximumFontSize() - $this->getMinimumFontSize()) / $this->getCountRange();
     }
 
     /**
@@ -243,5 +332,6 @@ class Taggly {
         return '<span class="tag" title="'.$tag->getTag().'" style="font-size: '
             .floor($fontSize).'px">'.e($tag->getTag()).'</span>';
     }
+
 
 }
